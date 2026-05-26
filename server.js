@@ -2,6 +2,7 @@ const express = require('express');
 const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 
 const app = express();
+const path = require('path');
 app.use(express.json());
 
 // Разрешаем кросс-доменные запросы от вашей HTML-формы
@@ -22,7 +23,7 @@ client.once('ready', () => {
 client.login(DISCORD_TOKEN);
 
 app.get('/', (req, res) => {
-    res.send('🚀 Сервер Vendeta Form Bot работает. Отправляйте POST-запросы на /submit-form');
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // --- API endpoint, который будет принимать POST-запросы с формы ---
