@@ -21,6 +21,10 @@ client.once('ready', () => {
 });
 client.login(DISCORD_TOKEN);
 
+app.get('/', (req, res) => {
+    res.send('🚀 Сервер Vendeta Form Bot работает. Отправляйте POST-запросы на /submit-form');
+});
+
 // --- API endpoint, который будет принимать POST-запросы с формы ---
 app.post('/submit-form', async (req, res) => {
     const data = req.body;
