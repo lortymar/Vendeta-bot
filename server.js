@@ -2,43 +2,61 @@ const express = require('express');
 const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 
 const app = express();
-const path = require('path');
 app.use(express.json());
 
-// Разрешаем кросс-доменные запросы от вашей HTML-формы
+// CORS для запросов с других доменов
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
 });
 
-// --- Инициализация Discord бота ---
+// --- Discord bot ---
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const TOKEN = process.env.DISCORD_TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
+const GREETING_SENT = process.env.GREETING_SENT === 'true';
 
-client.once('ready', () => {
-    console.log(`✅ Бот ${client.user.tag} запущен и готов к работе!`);
+client.once('ready', async () => {
+    console.log(`✅ Бот ${client.user.tag} запущен`);
+
+    if (!GREETING_SENT) {
+        try {
+            const channel = await client.channels.fetch(CHANNEL_ID);
+            if (!channel) throw new Error('Канал не найден');
+
+            // Определяем базовый URL (домен Railway)
+            const baseUrl = process.env.RAILWAY_STATIC_URL 
+                ? `https://${process.env.RAILWAY_STATIC_URL}` 
+                : 'https://vendeta-bot-production.up.railway.app';
+
+            // Текст сообщения с пингом everyone и кликабельной ссылкой
+            const messageText = `@everyone\n**Бот Vendeta готов принимать заявки!**\nПерейти к [Форме](${baseUrl}) и подать заявку в семью.`;
+
+            await channel.send(messageText);
+            console.log('✅ Приветствие с пингом отправлено');
+        } catch (err) {
+            console.error('Ошибка при отправке приветствия:', err);
+        }
+    } else {
+        console.log('Приветствие уже было отправлено ранее');
+    }
 });
-client.login(DISCORD_TOKEN);
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+client.login(TOKEN);
 
-// --- API endpoint, который будет принимать POST-запросы с формы ---
+// --- Обработка формы ---
 app.post('/submit-form', async (req, res) => {
     const data = req.body;
-    console.log('Получена новая заявка:', data);
+    console.log('Заявка:', data);
 
-    // Проверка обязательных полей
     if (!data.nickname || !data.ic_age || !data.ooc_age) {
-        return res.status(400).json({ error: 'Пожалуйста, заполните все обязательные поля.' });
+        return res.status(400).json({ error: 'Заполните все поля' });
     }
 
-    // Создаём красивое сообщение для Discord
     const embed = new EmbedBuilder()
-        .setColor(0xaa2e2e) // Красный цвет семьи Vendeta
+        .setColor(0xaa2e2e)
         .setTitle('📜 Новая заявка в Vendeta')
         .addFields(
             { name: '🏍️ Погоняло', value: data.nickname, inline: true },
@@ -54,17 +72,19 @@ app.post('/submit-form', async (req, res) => {
 
     try {
         const channel = await client.channels.fetch(CHANNEL_ID);
-        if (!channel) throw new Error('Канал не найден');
         await channel.send({ embeds: [embed] });
-        res.status(200).json({ message: '✅ Заявка успешно ушла братве!' });
+        res.status(200).json({ message: 'Заявка отправлена' });
     } catch (err) {
-        console.error('Ошибка отправки в Discord:', err);
-        res.status(500).json({ error: '❌ Не удалось отправить заявку. Попробуйте позже.' });
+        console.error(err);
+        res.status(500).json({ error: 'Ошибка Discord' });
     }
 });
 
-// Запуск сервера
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🚀 Веб-сервер готов и слушает порт ${PORT}`);
+// Отдача HTML-формы, если она в том же проекте
+const path = require('path');
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Сервер на порту ${PORT}`));
